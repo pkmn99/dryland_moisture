@@ -9,6 +9,9 @@ from cartopy.feature import ShapelyFeature
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from plot_prec_comparison import plot_map
+"""
+A map figure to show moisture source of China drylands
+"""
 
 # Add lat lon to map figure
 def set_lat_lon(ax, xtickrange, ytickrange, label=False,pad=0.05, fontsize=8,pr=ccrs.PlateCarree()):
@@ -64,5 +67,20 @@ def make_plot():
     plt.savefig('../figure/fig_china_dryland_prec_source.png',dpi=300,bbox_inches='tight')
     print('figure saved')
 
+
+# report internal precipitation contribution from drylands itself
+def print_dryland_ratio():
+    s = xr.open_dataset('../data/results/china_dryland_prec_source.nc')
+    ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')# aridity data
+    # create area weights following 
+    # https://docs.xarray.dev/en/stable/examples/area_weighted_temperature.html
+
+    weights = np.cos(np.deg2rad(s.lat))
+    weights.name = "weights"
+    pe_in = s.e_to_prec.sum(dim='month').where(ai.Band1>0).weighted(weights).sum().values # in drylands
+    pe_out = s.e_to_prec.sum(dim='month').where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
+    print('dryland internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
+
 if __name__=="__main__":
-   make_plot() 
+#   make_plot() 
+   print_dryland_ratio()
