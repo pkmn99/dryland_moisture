@@ -113,7 +113,6 @@ def load_gleam_data(temporal_res,spatial_res='05deg',start_year=1990,end_year=20
     else:
         return d
 
-
 # Remove linear trend based on xarray polyfit
 
 """
@@ -260,7 +259,8 @@ def save_e_to_prec_ymonmean():
 
     print('file saved')
 
-def save_prec_source():
+# Calculate moisture region of dryland and save by aridity
+def save_prec_source_aridity():
     subregion_index=pd.read_csv('../data/china_dryland_grid_index.csv')
 
     # Use ERA5 ET as it covers the ocean
@@ -269,10 +269,10 @@ def save_prec_source():
     
     n_lat, n_lon = dfe.shape[1::]
     
-    p = np.zeros([12, n_lat,n_lon])
+    p = np.zeros([4,12, n_lat,n_lon]) # first dim is 4 aridity
 
     # regional id 
-    region_id=subregion_index['id'].unique()
+    region_id=subregion_index['id'].unique() # region id here is for four aridity levels 
     date_list = pd.date_range('20080101','20081231',freq='MS') #MS means start of Month
 #    date_list = pd.date_range('20080101','20080228',freq='MS') #MS means start of Month
 
@@ -294,21 +294,64 @@ def save_prec_source():
             # change axis to allow for broadcast; targets grids (1st dim) muptiple ET to get precipitation contribution from 
             # different grids (2nd, 3rd dims)
             temp_p=np.moveaxis(temp_dfm.values, -1, 0) * dfe[m].values
-            p[m,:,:]=temp_p.sum(axis=0)
+            p[i,m,:,:]=temp_p.sum(axis=0)
 
             # Sum to get ET-derived precipitation for target grid
 
-    dpre=xr.DataArray(p, coords=[range(1,13), dfe.lat, dfe.lon],dims=['month','lat','lon'],name='e_to_prec')
+    dpre=xr.DataArray(p, coords=[region_id,range(1,13), dfe.lat, dfe.lon],dims=['aridity','month','lat','lon'],name='e_to_prec')
 
-    dpre.to_netcdf('../data/results/china_dryland_prec_source.nc')
+    dpre.to_netcdf('../data/results/china_dryland_prec_source_aridity.nc')
     print('file saved')
 
+# Calculate precipitation source region for each province in China
+def save_prec_source_province():
+    subregion_index=pd.read_csv('../data/china_province_grid_index.csv')
+
+    # Use ERA5 ET as it covers the ocean
+    dfe = load_era5_data('ET','ymonmean')
+    
+    n_lat, n_lon = dfe.shape[1::]
+
+    # regional id 
+    region_id=subregion_index['id'].unique()
+#    date_list = pd.date_range('20080101','20080228',freq='MS') #MS means start of Month
+    date_list = pd.date_range('20080101','20081231',freq='MS') #MS means start of Month
+
+    p = np.zeros([region_id.shape[0], 12, n_lat,n_lon])
+
+    for m,d in enumerate(date_list):
+        # load moisture data for month m
+        dfm = xr.open_dataset('../data/utrack_climatology_0.5_%02d.nc'%(m+1))
+        print('procssing month %d'%(m+1))
+
+        # Loop through provinces
+#        for i in range(1):
+        for i in range(region_id.shape[0]):
+            region_ma = (subregion_index['id']==region_id[i])
+            # Select moisture flow from source region defined by grid index, process region by region to save memory
+            # here select target grids by their lat,lon belonging to reigon id
+            temp_dfm= conversion_value(dfm.moisture_flow.sel(targetlat=xr.DataArray(subregion_index[region_ma].lat.values+0.25),
+                                    targetlon=xr.DataArray(subregion_index[region_ma].lon.values+0.25)))
+            print('processing region %d'%i)
+
+            # change axis to allow for broadcast; targets grids (1st dim) muptiple ET to get precipitation contribution from 
+            # different grids (2nd, 3rd dims)
+            temp_p=np.moveaxis(temp_dfm.values, -1, 0) * dfe[m].values
+            p[i,m,:,:]=temp_p.sum(axis=0)
+
+            # Sum to get ET-derived precipitation for target grid
+
+    dpre=xr.DataArray(p, coords=[region_id,range(1,13), dfe.lat, dfe.lon],dims=['province','month','lat','lon'],name='e_to_prec')
+
+    dpre.to_netcdf('../data/results/china_dryland_prec_source_province.nc')
+    print('file saved')
 
 if __name__=="__main__":
-    save_cn_label(rerun=True)
+#    save_cn_label(rerun=True)
 #    save_e_to_prec(start_year=1990, end_year=2020,et_data='GLEAM')
 #    save_e_to_prec(start_year=1990, end_year=2022,et_data='ERA5')
 #    save_e_to_prec_ymonmean()
-#    save_prec_source()
+#    save_prec_source_aridity()
+    save_prec_source_province()
 #    save_province_grid_index()
 #    et_data='GLEAM_v3.5a'
