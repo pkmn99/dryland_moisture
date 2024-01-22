@@ -36,9 +36,10 @@ def set_lat_lon(ax, xtickrange, ytickrange, label=False,pad=0.05, fontsize=8,pr=
 
 def make_plot():
     # Load data 
-    s = xr.open_dataset('../data/results/china_dryland_prec_source.nc')
+    s = xr.open_dataset('../data/results/china_dryland_prec_source_aridity.nc')
      
-    levels=[0.001,0.01,0.1,0.5,1,2]
+#    levels=[0.001,0.01,0.1,0.5,1,2]
+    levels=[1,10,50,100,200,300,1000]
 
     # define map projection
     pr=ccrs.PlateCarree()
@@ -46,41 +47,41 @@ def make_plot():
     fig = plt.figure(figsize=[6, 4])
 
     ax1 = fig.add_axes([0, 0, 1, 1], projection=pr)
-
-    im1=plot_map(s.e_to_prec.where(s.e_to_prec.sum(dim='month')>0.001).sum(dim='month'),
-                 ax=ax1, levels=levels, cmap='Blues',extent=[0, 150, 10, 80])
+    
+    dtemp=s.e_to_prec.sum(dim=['aridity','month'])
+    im1=plot_map(dtemp,
+                 ax=ax1, levels=levels, cmap='Blues',extent=[0, 150, 0, 70])
 
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
 
     ax1.set_title('Upwind source region of precipitation in China\'s drylands', fontsize=12)
 
-    set_lat_lon(ax1, range(0,151,30), range(10,81,20), label=True, pad=0.05, fontsize=10)
+    set_lat_lon(ax1, range(0,151,30), range(10,71,20), label=True, pad=0.05, fontsize=10)
 
     # Add colorbar to big plot
     cbarbig1_pos = [ax1.get_position().x0, ax1.get_position().y0-0.03, ax1.get_position().width, 0.02]
     caxbig1 = fig.add_axes(cbarbig1_pos)
-    cb = plt.colorbar(im1, orientation="horizontal", pad=0.15,cax=caxbig1,extend='neither',
+    cb = plt.colorbar(im1, orientation="horizontal", pad=0.15,cax=caxbig1,extend='min',
                      ticks=levels)
     cb.set_label(label='Precipitation contribution (mm/yr)')
     
-    plt.savefig('../figure/fig_china_dryland_prec_source.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_china_dryland_prec_source1124.png',dpi=300,bbox_inches='tight')
     print('figure saved')
-
 
 # report internal precipitation contribution from drylands itself
 def print_dryland_ratio():
-    s = xr.open_dataset('../data/results/china_dryland_prec_source.nc')
+    s = xr.open_dataset('../data/results/china_dryland_prec_source_aridity.nc')
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')# aridity data
     # create area weights following 
     # https://docs.xarray.dev/en/stable/examples/area_weighted_temperature.html
 
     weights = np.cos(np.deg2rad(s.lat))
     weights.name = "weights"
-    pe_in = s.e_to_prec.sum(dim='month').where(ai.Band1>0).weighted(weights).sum().values # in drylands
-    pe_out = s.e_to_prec.sum(dim='month').where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
+    pe_in = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1>0).weighted(weights).sum().values # in drylands
+    pe_out = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
     print('dryland internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
 
 if __name__=="__main__":
-#   make_plot() 
-   print_dryland_ratio()
+   make_plot() 
+#   print_dryland_ratio()
