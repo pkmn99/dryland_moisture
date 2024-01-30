@@ -45,32 +45,35 @@ def convert_map_by_aridity(r_map,ai):
     temp = [concat_r_ai(r_map,ai,i) for i in range(1,5)]
     return pd.concat(temp).set_index(['lat','lon'])
 
-def make_plot():
+def make_plot(et_data='GLEAM'):
+    start_year=2003
+    end_year=2022
 
     #Load data
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc') #aridity
     de_ycn_gleam = load_gleam_data('y') # GLEAM ET China
-    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=2020,et_data='GLEAM')
+    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=end_year,et_data=et_data)
     dp_ycn=load_era5_data('prec','y',cn_label=True)
 
-    de_ycn_upwind_gleam=load_e2p_data('upwind_ET','y',end_year=2020,et_data='GLEAM')
+    de_ycn_upwind_gleam=load_e2p_data('upwind_ET','y',end_year=end_year,et_data=et_data)
     dp_ycn_upwind_land=load_e2p_data('upwind_prec_land','y')
+
+    ai_con=ai.Band1>0
     
     # corr between prec con and downwind prec 
-    [r_pe_p,p_map]=xr_stats_corr(xr_detrend(dp_ycn.sel(time=slice('2001','2020'))),
-                   xr_detrend(dep_ycn_gleam.sel(time=slice('2001','2020'))), dim='time')
+    [r_pe_p,p_map1]=xr_stats_corr(xr_detrend(dp_ycn.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)),
+                   xr_detrend(dep_ycn_gleam.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)), dim='time')
     # corr between upwind prec and downwind prec
-    [r_pu_p,p_map]=xr_stats_corr(xr_detrend(dp_ycn_upwind_land.sel(time=slice('2001','2020'))), 
-                   xr_detrend(dp_ycn.sel(time=slice('2001','2020'))), dim='time')
+    [r_pu_p,p_map2]=xr_stats_corr(xr_detrend(dp_ycn_upwind_land.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)), 
+                   xr_detrend(dp_ycn.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)), dim='time')
     # corr between upwind ET and downwind prec
-    [r_eu_p,p_map]=xr_stats_corr(xr_detrend(de_ycn_upwind_gleam.sel(time=slice('2001','2020'))), 
-                   xr_detrend(dp_ycn.sel(time=slice('2001','2020'))), dim='time')
+    [r_eu_p,p_map3]=xr_stats_corr(xr_detrend(de_ycn_upwind_gleam.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)), 
+                   xr_detrend(dp_ycn.where(ai_con).sel(time=slice(str(start_year),str(end_year))).fillna(0)), dim='time')
     
     R_pe_p = convert_map_by_aridity(r_pe_p,ai)
     R_eu_p = convert_map_by_aridity(r_eu_p,ai)
     R_pu_p = convert_map_by_aridity(r_pu_p,ai)
 
-    ai_con=ai.Band1>0
     pr=ccrs.PlateCarree()
 
     # Begin plotting
@@ -79,7 +82,9 @@ def make_plot():
     ax1 = fig.add_axes([0, 0.7, 0.5, 0.3], projection=pr)
     im = plot_map(r_pe_p.where(ai_con),ax=ax1, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
                   extent=[73, 128, 28, 50])
-    ax1.text(0.5,0.9,'corr(P$_\mathrm{E}$, P)',transform=ax1.transAxes,fontsize=12,ha='center')
+    (p_map1.where(p_map1>0.05)).plot.contourf(hatches='////', colors='none', add_colorbar=False,ax=ax1)
+
+    ax1.text(0.5,0.9,'$r$(P$_\mathrm{E}$, P)',transform=ax1.transAxes,fontsize=12,ha='center')
     
     # switch green and yellow for sns colormap
     my_palette=[sns.color_palette()[0],sns.color_palette()[2],sns.color_palette()[1],sns.color_palette()[3]]
@@ -94,13 +99,14 @@ def make_plot():
     # ax1in.set_xticklabels(['0.65~0.5','0.5~0.2','0.2~0.05','<0.05'])
     ax1in.set_xlabel('')
     ax1in.set_ylabel('Correlation')
-    ax1in.set_title('corr(P$_\mathrm{E}$, P)')
+    ax1in.set_title('$r$(P$_\mathrm{E}$, P)')
     
     # panel c,d
     ax2 = fig.add_axes([0, 0.35, 0.5, 0.3], projection=pr)
     plot_map(r_pu_p.where(ai_con),ax=ax2, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
              extent=[73, 128, 28, 50])
-    ax2.text(0.5,0.9,'corr(P$_\mathrm{up}$, P)',transform=ax2.transAxes,fontsize=12,ha='center')
+    (p_map2.where(p_map2>0.05)).plot.contourf(hatches='////', colors='none', add_colorbar=False,ax=ax2)
+    ax2.text(0.5,0.9,'$r$(P$_\mathrm{up}$, P)',transform=ax2.transAxes,fontsize=12,ha='center')
     
     ax2in = fig.add_axes([0.6, ax2.get_position().y0, 0.35, ax2.get_position().height])
     sns.boxplot(x="AI", y="R", data=R_pu_p, showfliers=False,ax=ax2in,
@@ -110,13 +116,14 @@ def make_plot():
     ax2in.set_xticklabels(['Dry subhumid','Semiarid','Arid','Hyperarid'])
     ax2in.set_ylabel('Correlation')
     ax2in.set_xlabel('')
-    ax2in.set_title('corr(P$_\mathrm{up}$, P)')
+    ax2in.set_title('$r$(P$_\mathrm{up}$, P)')
     
     # panel e,f 
     ax3 = fig.add_axes([0, 0, 0.5, 0.3], projection=pr)
     im=plot_map(r_eu_p.where(ai_con),ax=ax3, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
                 extent=[73, 128, 28, 50])
-    ax3.text(0.5,0.9,'corr(E$_\mathrm{up}$, P)',transform=ax3.transAxes,fontsize=12,ha='center')
+    (p_map3.where(p_map3>0.05)).plot.contourf(hatches='////', colors='none', add_colorbar=False,ax=ax3)
+    ax3.text(0.5,0.9,'$r$(E$_\mathrm{up}$, P)',transform=ax3.transAxes,fontsize=12,ha='center')
     
     ax3in = fig.add_axes([0.6, ax3.get_position().y0, 0.35, ax3.get_position().height])
     sns.boxplot(x="AI", y="R", data=R_eu_p, showfliers=False,ax=ax3in,
@@ -126,7 +133,7 @@ def make_plot():
     ax3in.set_xticklabels(['Dry subhumid','Semiarid','Arid','HyperArid'])
     ax3in.set_ylabel('Correlation')
     ax3in.set_xlabel('')
-    ax3in.set_title('corr(E$_\mathrm{up}$, P)')
+    ax3in.set_title('$r$(E$_\mathrm{up}$, P)')
     
     set_lat_lon(ax1, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
     set_lat_lon(ax2, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
@@ -147,8 +154,8 @@ def make_plot():
     ax2in.text(-0.075, 1.05, 'd', fontsize=14, transform=ax2in.transAxes, fontweight='bold')
     ax3in.text(-0.075, 1.05, 'f', fontsize=14, transform=ax3in.transAxes, fontweight='bold')
 
-    plt.savefig('../figure/fig_pe_prec_corr_map.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_pe_prec_corr_map_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
-    make_plot()
+    make_plot(et_data='ERA5')
