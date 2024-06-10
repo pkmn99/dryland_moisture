@@ -39,11 +39,11 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
     if grow_season:
         evi = ds_month_range(load_evi_data(temporal_res='mon',source=source))
         dp_ycn=ds_month_range(load_era5_data('prec','mon',cn_label=True))
-        dep_ycn_gleam=ds_month_range(load_e2p_data('e_to_prec','mon',end_year=end_year,et_data=et_data))
+        dep_ycn_gleam=ds_month_range(load_e2p_data('e_to_prec_land','mon',end_year=end_year,et_data=et_data))
 
     else:
         evi = load_evi_data(source=source) # * 10 for terra
-        dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=end_year,et_data=et_data)
+        dep_ycn_gleam=load_e2p_data('e_to_prec_land','y',end_year=end_year,et_data=et_data)
         dp_ycn=load_era5_data('prec','y',cn_label=True)
    #    evi = load_evi_data(temporal_res='y',source='aqua')
 
@@ -107,30 +107,34 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
     sns.barplot(x='Aridity',y='R',data=R_array,hue='var',ax=ax2)
     ax2.set_ylabel('Correlation',labelpad=1)
     ax2.set_xlabel('')
-    ax2.set_ylim([0,0.95])
+    ax2.set_ylim([0,1])
     ax2.set_xticklabels(['Dry subhumid','Semiarid','Arid','Hyperarid'])
     
     # Add label for p value, double ** for p <0.05 and single * for p< 0.1
     for i in range(8):
         if R_array['p'][i]<0.05:
-            ax2.text(ax2.patches[i].get_x()+ax2.patches[0].get_width()/2 , R_array['R'][i]+0.025,'**',
+            ax2.text(ax2.patches[i].get_x()+ax2.patches[0].get_width()/2 , R_array['R'][i]+0.015,'**',
                     ha='center',color='k')
         if (R_array['p'][i]<0.1)&(R_array['p'][i]>0.05):
-            ax2.text(ax2.patches[i].get_x()+ax2.patches[0].get_width()/2 , R_array['R'][i]+0.025,'*',
+            ax2.text(ax2.patches[i].get_x()+ax2.patches[0].get_width()/2 , R_array['R'][i]+0.015,'*',
                     ha='center',color='k')
     
     ax2.legend([ax2.patches[0],ax2.patches[4]],['$r$(P$_\mathrm{E}$, EVI)','$r$(P, EVI)'],frameon=False)
-
+    print(R_array)
 
     # Panel C
-    im = plot_map(r_map.where(p_map0<0.05),ax=ax3, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
+    im = plot_map(r_map.where(p_map<0.05),ax=ax3, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
                   extent=[73, 128, 28, 50])
+#    p_map.where(p_map>0.05).plot.contourf(hatches='.', colors='none', add_colorbar=False,ax=ax3)
     set_lat_lon(ax3, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
+
+#    [print(r_map.where((p_map<0.05)&(ai.Band1==i)).mean()) for i in range(1,5)]
 
     ax3.text(0.15,0.9,'$r$(P$_\mathrm{E}$, EVI)',transform=ax3.transAxes,fontsize=12,ha='center')
 
-    im2 = plot_map(r_map0.where(p_map0<0.1),ax=ax3in, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
+    im2 = plot_map(r_map0.where(p_map0<0.05),ax=ax3in, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
                   extent=[73, 128, 28, 50])
+#    p_map0.where(p_map0>0.05).plot.contourf(hatches='.', colors='none', add_colorbar=False,ax=ax3in)
     ax3in.text(0.2,0.85,'$r$(P, EVI)',transform=ax3in.transAxes,fontsize=12,ha='center')
 #    set_lat_lon(ax3, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
 
@@ -144,10 +148,13 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
     ax1.text(-0.12, 1.05, 'a', fontsize=14, transform=ax1.transAxes, fontweight='bold')
     ax2.text(-0.12, 1.05, 'b', fontsize=14, transform=ax2.transAxes, fontweight='bold')
     ax3.text(-0.05, 1.05, 'c', fontsize=14, transform=ax3.transAxes, fontweight='bold')
-
-    plt.savefig('../figure/fig_pe_evi_corr_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
+    if grow_season:
+        plt.savefig('../figure/fig_pe_evi_corr_%s_gs0129.png'%et_data,dpi=300,bbox_inches='tight')
+    else:
+        plt.savefig('../figure/fig_pe_evi_corr_%s_annual0129.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
 #    make_plot(et_data='GLEAM')
     make_plot(et_data='ERA5',grow_season=True)
+#    make_plot(et_data='ERA5',grow_season=False)
