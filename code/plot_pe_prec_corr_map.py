@@ -52,7 +52,7 @@ def make_plot(et_data='GLEAM'):
     #Load data
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc') #aridity
     de_ycn_gleam = load_gleam_data('y') # GLEAM ET China
-    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=end_year,et_data=et_data)
+    dep_ycn_gleam=load_e2p_data('e_to_prec_land','y',end_year=end_year,et_data=et_data)
     dp_ycn=load_era5_data('prec','y',cn_label=True)
 
     de_ycn_upwind_gleam=load_e2p_data('upwind_ET','y',end_year=end_year,et_data=et_data)
@@ -74,6 +74,9 @@ def make_plot(et_data='GLEAM'):
     R_eu_p = convert_map_by_aridity(r_eu_p,ai)
     R_pu_p = convert_map_by_aridity(r_pu_p,ai)
 
+    print('correlation of P and Pe by aridity')
+    print(R_pe_p.groupby('AI').median())
+
     pr=ccrs.PlateCarree()
 
     # Begin plotting
@@ -83,6 +86,8 @@ def make_plot(et_data='GLEAM'):
     im = plot_map(r_pe_p.where(ai_con),ax=ax1, levels=np.arange(-1,1.01,0.1), cmap='RdBu_r',
                   extent=[73, 128, 28, 50])
     (p_map1.where(p_map1>0.05)).plot.contourf(hatches='////', colors='none', add_colorbar=False,ax=ax1)
+    print('Prec and Pe corr, median over the region is %f'%r_pe_p.where(ai_con).median().values)
+    print('Insignificant fraction is %f for map 1'%((p_map1>0.05).sum()/(p_map1>0).sum().values))
 
     ax1.text(0.5,0.9,'$r$(P$_\mathrm{E}$, P)',transform=ax1.transAxes,fontsize=12,ha='center')
     
@@ -117,6 +122,7 @@ def make_plot(et_data='GLEAM'):
     ax2in.set_ylabel('Correlation')
     ax2in.set_xlabel('')
     ax2in.set_title('$r$(P$_\mathrm{up}$, P)')
+    print('Insignificant fraction is %f for map 2'%((p_map2>0.05).sum()/(p_map2>0).sum().values))
     
     # panel e,f 
     ax3 = fig.add_axes([0, 0, 0.5, 0.3], projection=pr)
@@ -134,6 +140,7 @@ def make_plot(et_data='GLEAM'):
     ax3in.set_ylabel('Correlation')
     ax3in.set_xlabel('')
     ax3in.set_title('$r$(E$_\mathrm{up}$, P)')
+    print('Insignificant fraction is %f for map 3'%((p_map3>0.05).sum()/(p_map3>0).sum().values))
     
     set_lat_lon(ax1, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
     set_lat_lon(ax2, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
@@ -154,7 +161,7 @@ def make_plot(et_data='GLEAM'):
     ax2in.text(-0.075, 1.05, 'd', fontsize=14, transform=ax2in.transAxes, fontweight='bold')
     ax3in.text(-0.075, 1.05, 'f', fontsize=14, transform=ax3in.transAxes, fontweight='bold')
 
-    plt.savefig('../figure/fig_pe_prec_corr_map_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
+#    plt.savefig('../figure/fig_pe_prec_corr_map_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
