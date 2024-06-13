@@ -99,9 +99,11 @@ def make_plot(et_data='ERA5'):
     ############## ax2 to ax5 
     ax2 = fig.add_axes([0, 0.235, 0.45, 0.35], projection=pr)
     im2=plot_map(ratio.where(ai_con),ax=ax2, levels=np.arange(0,1.01,0.1), cmap='OrRd',extent=[73, 128, 28, 50]) #'OrRd''YlOrBr'
+    print('lowest land fraction ratio is %f and mean is %f'%(ratio.where(ai_con).min().values,ratio.where(ai_con).mean().values))
     
     ### ax3 Panel B: bar 
     ratio_mon = (dep_ymonmeancn_land.where(ai_con).weighted(w).mean(dim=['lat','lon'])/dep_ymonmeancn.where(ai_con).weighted(w).mean(dim=['lat','lon']))
+    print(ratio_mon)
     ratio2_mon = (dep_ymonmeancn_cndry.where(ai_con).weighted(w).mean(dim=['lat','lon'])/dep_ymonmeancn.where(ai_con).weighted(w).mean(dim=['lat','lon']))
 
     ax3 = fig.add_axes([0.55, ax2.get_position().y0, 0.45, ax2.get_position().height])
@@ -149,7 +151,6 @@ def make_plot(et_data='ERA5'):
     ax2.text(-0.1, 1.05, 'd', fontsize=14, transform=ax4.transAxes, fontweight='bold')
     ax2.text(-0.1, 1.05, 'e', fontsize=14, transform=ax5.transAxes, fontweight='bold')
 
-    
     plt.savefig('../figure/fig_china_dryland_prec_source_0122.png',dpi=300,bbox_inches='tight')
     print('figure saved')
 
@@ -162,10 +163,15 @@ def print_dryland_ratio():
 
     weights = np.cos(np.deg2rad(s.lat))
     weights.name = "weights"
-    pe_in = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1>0).weighted(weights).sum().values # in drylands
-    pe_out = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
-    print('dryland internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
+#    pe_in = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1>0).weighted(weights).sum().values # in drylands
+#    pe_out = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
+#    print('dryland internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
+
+    pe_in = s.e_to_prec.sum(dim=['aridity']).where(ai.Band1>0).weighted(weights).sum(['lat','lon']).values # in drylands
+    pe_out = s.e_to_prec.sum(dim=['aridity']).where(ai.Band1.isnull()).weighted(weights).sum(['lat','lon']).values# out drylands
+    print('dryland internal contribution to precipitation is ')
+    print((pe_in/(pe_in+pe_out)))
 
 if __name__=="__main__":
-   make_plot() 
-#   print_dryland_ratio()
+#   make_plot() 
+   print_dryland_ratio()
