@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.colors import ListedColormap
 import cartopy.crs as ccrs
 import cartopy.io.shapereader as shpreader
 from cartopy.feature import ShapelyFeature
@@ -39,7 +40,7 @@ def set_lat_lon(ax, xtickrange, ytickrange, label=False,pad=0.05, fontsize=8,pr=
 def make_plot(et_data='ERA5'):
     # set time range 
     start_year=2003
-    end_year=2020
+    end_year=2022
 
     # Load data 
     # Moisture source
@@ -84,7 +85,7 @@ def make_plot(et_data='ERA5'):
     ax1.spines['top'].set_visible(False)
     ax1.spines['right'].set_visible(False)
 
-    ax1.set_title('Moisture source of precipitation in China\'s drylands', fontsize=12)
+    ax1.set_title('Moisture sources of China\'s drylands', fontsize=14)
 
     set_lat_lon(ax1, range(0,151,30), range(10,71,20), label=True, pad=0.05, fontsize=10)
 
@@ -93,7 +94,24 @@ def make_plot(et_data='ERA5'):
     caxbig1 = fig.add_axes(cbarbig1_pos)
     cb = plt.colorbar(im1, orientation="horizontal", pad=0.05,cax=caxbig1,extend='min',
                      ticks=levels1)
-    cb.set_label(label='Moisture contribution (mm/yr)')
+    cb.set_label(label='Precipitation contributed by moisture sources (mm/yr)',fontsize=12)
+
+
+    #Add panel a inset to show aridity levels
+     # Add customed colobar for Reds
+    Reds = mpl.colormaps['Reds'].resampled(8)
+    cmap_ai = ListedColormap(Reds(np.linspace(0.2, 1, 4))) # Start from 0.2 for a darker color
+
+    ax1in = fig.add_axes([0, 0.485, 0.35, 0.25], projection=pr)
+    im=ai.Band1.plot(cmap=cmap_ai,ax=ax1in,add_colorbar=False)
+    ax1in.set_extent([73, 130, 29, 49],ccrs.Geodetic())
+
+    cbarax1in_pos = [ax1in.get_position().x1+0.01, ax1in.get_position().y0, 0.01, ax1in.get_position().height]
+    caxax1in = fig.add_axes(cbarax1in_pos)
+    cb = plt.colorbar(im, orientation="vertical", pad=0.15, cax=caxax1in, extend='neither',
+                     ticks=np.arange(1+3/4/2,4+3/4/2,3/4)) # Label 1 to 4 has 3  for length; divide 3/4 is tick interval, further divide by 2 for half shift
+    cb.ax.set_yticklabels(['Dry subhumid','Semiarid','Arid','Hyperarid'], fontsize=10)
+    ax1in.text(0.5, 0.8, 'Aridity', fontsize=12, transform=ax1in.transAxes, ha='center')
 
 
     ############## ax2 to ax5 
@@ -109,9 +127,9 @@ def make_plot(et_data='ERA5'):
     ax3 = fig.add_axes([0.55, ax2.get_position().y0, 0.45, ax2.get_position().height])
     ax3.bar(range(1,13,),ratio_mon,color=sns.color_palette()[3])
     ax3.bar(range(1,13,),ratio2_mon,color=sns.color_palette()[1])
-    ax3.set_xlabel('Month')
-    ax3.set_ylabel('Moisture source')
-    ax3.legend(['Land','Dryland'],frameon=False,handletextpad=0.5,ncols=2,loc=[0.2,0.85],fontsize=9)
+    ax3.set_xlabel('Month',fontsize=12)
+    ax3.set_ylabel('Terrestial source fraction')
+    ax3.legend(['External','Dryland'],frameon=False,handletextpad=0.5,ncols=2,loc=[0.2,0.85],fontsize=9)
     ax3.set_ylim([0,1.15])
     
     # ax4 Panel C: map
@@ -126,7 +144,7 @@ def make_plot(et_data='ERA5'):
     (dp_ymonmeancn.where(ai_con).weighted(w).mean(dim=['lat','lon'])).plot(ax=ax5)
     ax5.legend(['P$_\mathrm{E}$','P$_\mathrm{E}$(dryland)','P'],frameon=False,handlelength=1)
     ax5.set_ylabel('Precipitation (mm/yr)')
-    ax5.set_xlabel('Month')
+    ax5.set_xlabel('Month',fontsize=12)
 
     # add lat lon tick
     set_lat_lon(ax2, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
@@ -137,13 +155,13 @@ def make_plot(et_data='ERA5'):
     caxbig2 = fig.add_axes(cbarbig2_pos)
     cb = plt.colorbar(im2, orientation="horizontal", pad=0.15,cax=caxbig2,extend='neither',
                      ticks=np.arange(0,1.01,0.2))
-    cb.set_label(label='Land source fraction')
+    cb.set_label(label='Terrestial source fraction', fontsize=12)
 
     cbarbig3_pos = [ax4.get_position().x0, ax4.get_position().y0-0.01, ax4.get_position().width, 0.01]
     caxbig3 = fig.add_axes(cbarbig3_pos)
     cb = plt.colorbar(im3, orientation="horizontal", pad=0.15,cax=caxbig3,extend='neither',
                      ticks=np.arange(0,1000,100))
-    cb.set_label(label='P$_\mathrm{E}$ (mm/yr)')
+    cb.set_label(label='P$_\mathrm{E}$ (mm/yr)',fontsize=12)
     
     ax1.text(-0.05, 1.05, 'a', fontsize=14, transform=ax1.transAxes, fontweight='bold')
     ax2.text(-0.1, 1.05, 'b', fontsize=14, transform=ax2.transAxes, fontweight='bold')
@@ -151,7 +169,7 @@ def make_plot(et_data='ERA5'):
     ax2.text(-0.1, 1.05, 'd', fontsize=14, transform=ax4.transAxes, fontweight='bold')
     ax2.text(-0.1, 1.05, 'e', fontsize=14, transform=ax5.transAxes, fontweight='bold')
 
-    plt.savefig('../figure/fig_china_dryland_prec_source_0122.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_china_dryland_prec_source_0614.png',dpi=300,bbox_inches='tight')
     print('figure saved')
 
 # report internal precipitation contribution from drylands itself
@@ -173,5 +191,5 @@ def print_dryland_ratio():
     print((pe_in/(pe_in+pe_out)))
 
 if __name__=="__main__":
-#   make_plot() 
-   print_dryland_ratio()
+   make_plot() 
+#   print_dryland_ratio()
