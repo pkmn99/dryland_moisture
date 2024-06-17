@@ -54,8 +54,9 @@ def make_plot(et_data='GLEAM'):
     de_ycn_gleam = load_gleam_data('y') # GLEAM ET China
     dep_ycn_gleam=load_e2p_data('e_to_prec_land','y',end_year=end_year,et_data=et_data)
     dp_ycn=load_era5_data('prec','y',cn_label=True)
-
-    de_ycn_upwind_gleam=load_e2p_data('upwind_ET','y',end_year=end_year,et_data=et_data)
+    # For GLEAM et data, upwind_ET and upwind_ET_land is the same; 
+    # But for ERA5 data, have to use upwind_ET_land, otherwise it is all sources (land+ocean)
+    de_ycn_upwind_gleam=load_e2p_data('upwind_ET_land','y',end_year=end_year,et_data=et_data)
     dp_ycn_upwind_land=load_e2p_data('upwind_prec_land','y')
 
     ai_con=ai.Band1>0
@@ -161,7 +162,7 @@ def make_plot(et_data='GLEAM'):
     ax2in.text(-0.075, 1.05, 'd', fontsize=14, transform=ax2in.transAxes, fontweight='bold')
     ax3in.text(-0.075, 1.05, 'f', fontsize=14, transform=ax3in.transAxes, fontweight='bold')
 
-#    plt.savefig('../figure/fig_pe_prec_corr_map_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_pe_prec_corr_map_%s0610.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
