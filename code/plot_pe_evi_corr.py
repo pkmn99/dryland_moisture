@@ -115,10 +115,10 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
                      detrend(evi.sel(time=slice(str(start_year),str(end_year))).where(ai_con&p_con).mean(dim=['lat','lon']).values*10000))
     
     ax1.text(0.05,0.075,'r=%.2f\np=%.3f'%(r,p),transform=ax1.transAxes)
-    ax1.set_ylabel('P$_\mathrm{E}$(mm/yr)',color='b',labelpad=0.5)
+    ax1.set_ylabel('P$_mathrm{E}$(mm/yr)',color='b',labelpad=0.5)
     ax1.set_xticks(range(2003,2022,3))
     ax1sec.set_ylabel('EVI*10000',color='g',labelpad=1)
-    ax1.legend([ax1.lines[0],ax1sec.lines[0]],['P$_\mathrm{E}$','EVI'],
+    ax1.legend([ax1.lines[0],ax1sec.lines[0]],['$\overline{\mathrm{P_E}}$','$\overline{\mathrm{EVI}}$'],
             frameon=False,loc='upper left')
 
     # Panel B 
@@ -137,7 +137,9 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
             ax2.text(ax2.patches[i].get_x()+ax2.patches[0].get_width()/2 , R_array['R'][i]+0.015,'*',
                     ha='center',color='k')
     
-    ax2.legend([ax2.patches[0],ax2.patches[4]],['$r$(P$_\mathrm{E}$, EVI)','$r$(P, EVI)'],frameon=False)
+    ax2.legend([ax2.patches[0],ax2.patches[4]],[r'$r(\overline{\mathrm{P_E}}, \overline{\mathrm{EVI}}$)',
+        r'$r(\overline{\mathrm{P}}, \overline{\mathrm{EVI}})$'],frameon=False)
+#    ax3.text(0.15,0.95,r'$r(\overline{P_\mathrm{E}}, \overline{EVI})$',transform=ax3.transAxes,fontsize=12,ha='center')
     print(R_array)
 
     # Panel C
@@ -148,7 +150,7 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
 
 #    [print(r_map.where((p_map<0.05)&(ai.Band1==i)).mean()) for i in range(1,5)]
 
-    ax3.text(0.15,0.95,'$r$(P$_\mathrm{E}$, EVI)',transform=ax3.transAxes,fontsize=12,ha='center')
+    ax3.text(0.15,0.95,r'$r(\mathrm{P_E}$, EVI)',transform=ax3.transAxes,fontsize=12,ha='center')
     ax3.text(0.075,0.89,'dryland:%d%%'%(np.round(r_dry[0]*100)),
             transform=ax3.transAxes,fontsize=10,ha='center')
     ax3.text(0.225,0.89,'external:%d%%'%(np.round(r_dry[1]*100)),
@@ -159,6 +161,8 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
 #    p_map0.where(p_map0>0.05).plot.contourf(hatches='.', colors='none', add_colorbar=False,ax=ax3in)
     ax3in.text(0.2,0.85,'$r$(P, EVI)',transform=ax3in.transAxes,fontsize=12,ha='center')
 #    set_lat_lon(ax3, range(80,130,20), range(30,52,10), label=True, pad=0.05, fontsize=10)
+
+    print('percentage of significant r(Pe-EVI) to r(P-EVI) is %f'%(((p_map<0.05)&(p_map0<0.05)).sum().values/(p_map0<0.05).sum().values))
 
     # add colorbar
     cbarbig1_pos = [ax3.get_position().x0, ax3.get_position().y0-0.03, ax3.get_position().width, 0.015]
