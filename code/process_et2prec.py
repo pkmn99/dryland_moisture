@@ -14,15 +14,17 @@ def save_China_dryland_grid_index():
 # lat and lon grids for retangular area of China
 def save_cn_label(rerun=False):
     if rerun:
-        d_ref=xr.open_dataset('../data/results/e_to_prec_ymonmean_2008-2017.nc')
+       # d_ref=xr.open_dataset('../data/results/e_to_prec_ymonmean_2008-2017.nc')
+        d_ref=xr.open_dataset('../data/results/ERA5_e_to_prec_mon_1990-20221127.nc')
+        
        # d_ref.lat.to_pandas().reset_index()['lat'].to_csv('../data/results/cn_label_lat.csv',index=False)
        # d_ref.lon.to_pandas().reset_index()['lon'].to_csv('../data/results/cn_label_lon.csv',index=False)    
-        d_ref.lat.to_netcdf('../data/results/cn_label_lat.nc')
-        d_ref.lon.to_netcdf('../data/results/cn_label_lon.nc')    
+        d_ref.lat.to_netcdf('../data/results/cn_label_lat1127.nc')
+        d_ref.lon.to_netcdf('../data/results/cn_label_lon1127.nc')    
         print('rerun; lat and lon label saved to file')
     else:
-        lat =xr.open_dataarray('../data/results/cn_label_lat.nc')    
-        lon =xr.open_dataarray('../data/results/cn_label_lon.nc')    
+        lat =xr.open_dataarray('../data/results/cn_label_lat1127.nc')
+        lon =xr.open_dataarray('../data/results/cn_label_lon1127.nc')
         return lat,lon
 
 def apply_cn_label(d):
@@ -80,10 +82,45 @@ def load_era5_data(var,temporal_res,spatial_res='05deg',start_year=1990,end_year
     else:
         return d
 
+def load_evi_data(var='EVI',temporal_res="y",start_year=2003,end_year=2022,cn_label=True,source='aqua'):
+    if source=='aqua':
+        d=xr.open_dataset('../data/EVI_mon_05deg_2003_2022_clean.nc')#.slice(time=slice(str(start_year),str(end_year)))
+    if source=='terra':
+        d = xr.open_dataset('../../data/MODIS_EVI/terra_EVI_2001_2023/MOD13A3_EVI_01_23_05deg_north.nc')
+
+    if temporal_res=='ymonmean':
+        d=d[var].groupby("time.month").mean(dim=['time'])
+
+    if temporal_res=='y':
+        d=d[var].resample(time="Y").mean(dim=['time'])
+
+    if temporal_res=='ymax':
+        d=d[var].resample(time="Y").max(dim=['time'])
+
+    if temporal_res=='mon':
+        d=d[var]
+
+    # if China subset
+    if cn_label:
+        return apply_cn_label(d)
+    else:
+        return d
+
+# Only yearly
+def load_gpp_data(temporal_res="y",start_year=2003,end_year=2018,cn_label=True):
+    d=xr.open_dataset('../../data/PML/PML_GPP_20032018_05deg.nc')['GPP_year'].sel(time=slice(str(start_year),str(end_year)))
+    d['time'] = pd.date_range('20030101','20181231',freq='A') # change time index to end of year to match other data
+
+    # if China subset
+    if cn_label:
+        return apply_cn_label(d)
+    else:
+        return d
+
 # Load precipitation contribution from ET (P_E)
 def load_e2p_data(var,temporal_res,start_year=1990,end_year=2022,et_data='ERA5'):
     file_daterange={"GLEAM":[1990,2020],
-                    "ERA5":[1990,2022]}
+                    "ERA5":[2003,2022]}
     d = xr.open_dataset('../data/results/%s_e_to_prec_mon_%d-%d.nc'%(et_data,file_daterange[et_data][0],
                                                                          file_daterange[et_data][1]))
     # aggregate to annual sum
@@ -126,7 +163,11 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
    # dfe = xr.open_dataset('../../data/ERA5/ERA5-ET-%d-%d-mon-05deg.nc'%(start_year,end_year))['e']
    # dfe=(dfe*dfe.time.dt.daysinmonth)*1000*-1
 
+    # Be careful with ai variable with numpy array. It requires np.flipud to align with other data north as first row
+    ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')
+
     dp = load_era5_data('prec','mon')
+    devi = load_evi_data(var='EVI',temporal_res="mon",start_year=start_year,end_year=end_year,cn_label=False)
 
     if et_data=="ERA5":
         dfe = load_era5_data('ET','mon')
@@ -145,7 +186,7 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
     result = subregion_index.merge(pd.DataFrame(date_list.rename('time')),how='cross')
 
     for m in range(12):
-#    for m in range(1):
+#    for m in range(6,7):
         # load moisture data for month m
         dfm = xr.open_dataset('../data/utrack_climatology_0.5_%02d.nc'%(m+1))
         print('procssing month %d'%(m+1))
@@ -166,11 +207,23 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
                 # change axis to allow for broadcast; targets grids (1st dim) muptiple ET to get precipitation contribution from 
                 # different grids (2nd, 3rd dims)
                 temp_p=np.moveaxis(temp_dfm.values, -1, 0) * dfe.sel(time=d,method='nearest').values
+                temp_evi=np.where(np.moveaxis(temp_dfm.values,-1,0)>10**-10, temp_p, np.nan) * devi.sel(time=d,method='nearest').values # moisture * EVI in upwind area
 
                 # Sum to get ET-derived precipitation for target grid
                 result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec'] = np.nansum(temp_p,axis=(1,2))
+                ## contribution from dryland itself
+                result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec_cndry'] =np.nansum(np.where(np.flipud(ai.Band1)>0,temp_p,0),axis=(1,2))
                 result.loc[((result['id']==region_id[i])&(result['time']==d)),'upwind_ET'] = \
                     np.nanmean(np.moveaxis(np.where(temp_dfm.values>10**-10, 1, np.nan),-1,0) * dfe.sel(time=d,method='nearest').values,axis=(1,2))
+
+                # weighted EVI
+               # result.loc[((result['id']==region_id[i])&(result['time']==d)),'upwind_evi_weighted']=np.nansum(temp_evi,axis=(1,2)) \
+               #         /np.nansum(np.where(temp_evi>0, np.moveaxis(temp_dfm.values, -1, 0), np.nan),axis=(1,2))
+                result.loc[((result['id']==region_id[i])&(result['time']==d)),'upwind_evi_weighted']=np.nansum(temp_evi,axis=(1,2)) \
+                        /np.nansum(np.where(temp_evi>0, temp_p, np.nan),axis=(1,2))
+
+                result.loc[((result['id']==region_id[i])&(result['time']==d)),'upwind_evi']= \
+                    np.nanmean(np.moveaxis(np.where(temp_dfm.values>10**-10, 1, np.nan),-1,0) * devi.sel(time=d,method='nearest').values,axis=(1,2))
 
                 if et_data=="ERA5":
                     result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec_land'] =np.where(lsm>0.5,temp_p,0).sum(axis=(1,2))
@@ -189,31 +242,39 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
 
 
     if et_data=="ERA5":
-        result_xr = result.set_index(['time','lat','lon'])[['e_to_prec','e_to_prec_land','e_to_prec_ocean',
+        result_xr = result.set_index(['time','lat','lon'])[['e_to_prec','e_to_prec_cndry','e_to_prec_land','e_to_prec_ocean',
                                                         'upwind_prec','upwind_prec_land','upwind_prec_ocean',
-                                                        'upwind_ET','upwind_ET_land','upwind_ET_ocean']].to_xarray()
+                                                        'upwind_ET','upwind_ET_land','upwind_ET_ocean',
+                                                        'upwind_evi','upwind_evi_weighted']].to_xarray()
         result_xr['e_to_prec'].attrs["units"] = "mm"
         result_xr['e_to_prec_land'].attrs["long_name"] = "Upwind land evaporation contributed precipitation"
         result_xr['e_to_prec_land'].attrs["units"] = "mm"
         result_xr['e_to_prec_ocean'].attrs["long_name"] = "Upwind ocean evaporation contributed precipitation"
         result_xr['e_to_prec_ocean'].attrs["units"] = "mm"
         result_xr['upwind_prec'].attrs["long_name"] = "Upwind mean precipitation"
+        result_xr['upwind_evi'].attrs["long_name"] = "Upwind mean evi"
+        result_xr['upwind_evi_weighted'].attrs["long_name"] = "Upwind evi weighted mean by moisture"
     else:
-        result_xr = result.set_index(['time','lat','lon'])[['e_to_prec','upwind_ET']].to_xarray()
-
+        result_xr = result.set_index(['time','lat','lon'])[['e_to_prec','e_to_prec_cndry','upwind_ET']].to_xarray()
+    
+    # Common variables 
     result_xr.lat.attrs["units"] = "degrees_north"
     result_xr.lon.attrs["units"] = "degrees_west"
     result_xr.lat.attrs["long_name"] = "latitude"
     result_xr.lon.attrs["long_name"] = "longitude"
+    result_xr['e_to_prec_cndry'].attrs["units"] = "mm"
+    result_xr['e_to_prec_cndry'].attrs["long_name"] = "China's dryland contributed precipitation"
     result_xr['e_to_prec'].attrs["long_name"] = "Upwind evaporation contributed precipitation"
     result_xr['upwind_ET'].attrs["long_name"] = "Upwind mean ET"
 
-    result_xr.to_netcdf('../data/results/%s_e_to_prec_mon_%d-%d.nc'%(et_data,start_year,end_year))
+    result_xr.to_netcdf('../data/results/%s_e_to_prec_mon_%d-%d0109.nc'%(et_data,start_year,end_year))
 
     print('file saved')
 
 def save_e_to_prec_ymonmean():
     subregion_index=pd.read_csv('../data/china_province_grid_index.csv')
+
+    ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')
 
     # Use ERA5 ET as it covers the ocean
     dfe = load_era5_data('ET','ymonmean')
@@ -223,6 +284,7 @@ def save_e_to_prec_ymonmean():
     # regional id 
     region_id=subregion_index['id'].unique()
     date_list = pd.date_range('20080101','20081231',freq='MS') #MS means start of Month
+#    date_list = pd.date_range('20080101','20080131',freq='MS') #MS means start of Month
 
     # Use cross merge to add time 
     result = subregion_index.merge(pd.DataFrame(date_list.rename('time')),how='cross')
@@ -245,17 +307,19 @@ def save_e_to_prec_ymonmean():
             # change axis to allow for broadcast; targets grids (1st dim) muptiple ET to get precipitation contribution from 
             # different grids (2nd, 3rd dims)
             temp_p=np.moveaxis(temp_dfm.values, -1, 0) * dfe[m].values
-
+#            print(temp_p.shape)
             # Sum to get ET-derived precipitation for target grid
            # result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec'] = temp_p.sum(axis=(1,2))
             result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec'] = np.nansum(temp_p,axis=(1,2))
+            ## contribution from dryland itself
+            result.loc[((result['id']==region_id[i])&(result['time']==d)),'e_to_prec_cndry'] =np.nansum(np.where(np.flipud(ai.Band1)>0,temp_p,0),axis=(1,2))
 
-    result_xr = result.set_index(['time','lat','lon'])['e_to_prec'].to_xarray()
+    result_xr = result.set_index(['time','lat','lon'])[['e_to_prec','e_to_prec_cndry']].to_xarray()
     result_xr.lat.attrs["units"] = "degrees_north"
     result_xr.lon.attrs["units"] = "degrees_west"
     result_xr.lat.attrs["long_name"] = "latitude"
     result_xr.lon.attrs["long_name"] = "longitude"
-    result_xr.to_netcdf('../data/results/e_to_prec_ymonmean_2008-2017.nc')
+    result_xr.to_netcdf('../data/results/ERA5_e_to_prec_ymonmean_2008-20171127.nc')
 
     print('file saved')
 
@@ -349,9 +413,12 @@ def save_prec_source_province():
 if __name__=="__main__":
 #    save_cn_label(rerun=True)
 #    save_e_to_prec(start_year=1990, end_year=2020,et_data='GLEAM')
+#    save_e_to_prec(start_year=2000, end_year=2020,et_data='GLEAM')
+#    save_e_to_prec(start_year=2000, end_year=2022,et_data='ERA5')
+    save_e_to_prec(start_year=2003, end_year=2022,et_data='ERA5')
 #    save_e_to_prec(start_year=1990, end_year=2022,et_data='ERA5')
 #    save_e_to_prec_ymonmean()
 #    save_prec_source_aridity()
-    save_prec_source_province()
+#    save_prec_source_province()
 #    save_province_grid_index()
 #    et_data='GLEAM_v3.5a'
