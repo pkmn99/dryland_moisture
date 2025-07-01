@@ -11,7 +11,7 @@ from cartopy.feature import ShapelyFeature
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from plot_prec_comparison import plot_map,my_weights
-from process_et2prec import load_era5_data,load_e2p_data,load_gleam_data
+from process_et2prec import load_era5_data,load_e2p_data
 """
 A map figure to show moisture source of China drylands
 """
@@ -45,7 +45,7 @@ def make_plot(et_data='ERA5'):
     # Load data 
     # Moisture source
     s = xr.open_dataset('../data/results/china_dryland_prec_source_aridity.nc')
-    # precipitation contribution
+    # precipitation contribution from default ERA5
     dep_ymonmeancn=load_e2p_data('e_to_prec','ymonmean',start_year=start_year,end_year=end_year)# prec con by ERA all ET
     dep_ymonmeancn_land=load_e2p_data('e_to_prec_land','ymonmean',start_year=start_year,end_year=end_year)# prec con by ERA land ET
     dep_ymonmeancn_cndry=load_e2p_data('e_to_prec_cndry','ymonmean',start_year=start_year,end_year=end_year)# prec con by ERA in China dryland
@@ -63,10 +63,31 @@ def make_plot(et_data='ERA5'):
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')# aridity data
     ai_con=ai.Band1>0 # select all dryland 
 
-    # calculate land-derived ratio of prec based on ERA5 data
+    # calculate land-derived ratio of prec for each grid based on ERA5 data
     ratio = dep_ymonmeancn_land.sum(dim='month')/dep_ymonmeancn.sum(dim='month')
     # calculate china dryland-derived ratio of prec based on ERA5 data
-    ratio2 = dep_ymonmeancn_cndry.sum(dim='month')/dep_ymonmeancn.sum(dim='month')
+    # ratio2 = dep_ymonmeancn_cndry.sum(dim='month')/dep_ymonmeancn.sum(dim='month')
+
+    r_land=dep_ymonmeancn_land.sum(dim='month').where(ai_con).weighted(w).mean()/dep_ymonmeancn.sum(dim='month').where(ai_con).weighted(w).mean()
+    r_cndry=dep_ymonmeancn_cndry.sum(dim='month').where(ai_con).weighted(w).mean()/dep_ymonmeancn.sum(dim='month').where(ai_con).weighted(w).mean()
+    print('land contribution to dryland precipitatin is %f'%r_land.values)
+    print('dryland contribution to their own precipitatin is %f'%r_cndry.values)
+
+#    print('monthly contribution from land moisture')
+#    print(dep_ymonmeancn_land.where(ai_con).weighted(w).mean(['lat','lon']))
+#    print('monthly contribution from dryland moisture')
+#    print(dep_ymonmeancn_cndry.where(ai_con).weighted(w).mean(['lat','lon']))
+#    print('monthly contribution from all moisture')
+#    print(dep_ymonmeancn.where(ai_con).weighted(w).mean(['lat','lon']))
+
+    # Temporary for review
+#    plt.plot((dep_ymonmeancn_land-dep_ymonmeancn_cndry).where(ai_con).weighted(w).mean(['lat','lon']))
+#    plt.plot(dep_ymonmeancn_cndry.where(ai_con).weighted(w).mean(['lat','lon']))
+#    plt.plot(dep_ymonmeancn.where(ai_con).weighted(w).mean(['lat','lon']))
+#    plt.xlabel('Month')
+#    plt.ylabel('PE (mm)')
+#    plt.legend([r'PE_external',r'PE_dryland','PE_all'])
+#    plt.show()
 
      
     levels1=[1,10,50,100,200,300,1000] # for moistutre source map
@@ -104,7 +125,7 @@ def make_plot(et_data='ERA5'):
 
     ax1in = fig.add_axes([0, 0.485, 0.35, 0.25], projection=pr)
     im=ai.Band1.plot(cmap=cmap_ai,ax=ax1in,add_colorbar=False)
-    ax1in.set_extent([73, 130, 29, 49],ccrs.Geodetic())
+    ax1in.set_extent([73, 128, 29, 49],ccrs.Geodetic())
 
     cbarax1in_pos = [ax1in.get_position().x1+0.01, ax1in.get_position().y0, 0.01, ax1in.get_position().height]
     caxax1in = fig.add_axes(cbarax1in_pos)
@@ -117,7 +138,6 @@ def make_plot(et_data='ERA5'):
     ############## ax2 to ax5 
     ax2 = fig.add_axes([0, 0.235, 0.45, 0.35], projection=pr)
     im2=plot_map(ratio.where(ai_con),ax=ax2, levels=np.arange(0,1.01,0.1), cmap='OrRd',extent=[73, 128, 28, 50]) #'OrRd''YlOrBr'
-    print('lowest land fraction ratio is %f and mean is %f'%(ratio.where(ai_con).min().values,ratio.where(ai_con).mean().values))
     
     ### ax3 Panel B: bar 
     ratio_mon = (dep_ymonmeancn_land.where(ai_con).weighted(w).mean(dim=['lat','lon'])/dep_ymonmeancn.where(ai_con).weighted(w).mean(dim=['lat','lon']))
@@ -169,11 +189,13 @@ def make_plot(et_data='ERA5'):
     ax2.text(-0.1, 1.05, 'd', fontsize=14, transform=ax4.transAxes, fontweight='bold')
     ax2.text(-0.1, 1.05, 'e', fontsize=14, transform=ax5.transAxes, fontweight='bold')
 
-    plt.savefig('../figure/fig_china_dryland_prec_source_0614.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_china_dryland_prec_source_0614.tif',dpi=300,bbox_inches='tight')
     print('figure saved')
 
 # report internal precipitation contribution from drylands itself
 def print_dryland_ratio():
+    lsm=xr.open_dataset('../../data/ERA5/ERA5-landseamask-1990-2022-mon-05deg.nc')['lsm'].squeeze()
+    land_mask=lsm>0.5
     s = xr.open_dataset('../data/results/china_dryland_prec_source_aridity.nc')
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')# aridity data
     # create area weights following 
@@ -181,14 +203,25 @@ def print_dryland_ratio():
 
     weights = np.cos(np.deg2rad(s.lat))
     weights.name = "weights"
-#    pe_in = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1>0).weighted(weights).sum().values # in drylands
-#    pe_out = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1.isnull()).weighted(weights).sum().values# out drylands
-#    print('dryland internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
 
-    pe_in = s.e_to_prec.sum(dim=['aridity']).where(ai.Band1>0).weighted(weights).sum(['lat','lon']).values # in drylands
-    pe_out = s.e_to_prec.sum(dim=['aridity']).where(ai.Band1.isnull()).weighted(weights).sum(['lat','lon']).values# out drylands
-    print('dryland internal contribution to precipitation is ')
-    print((pe_in/(pe_in+pe_out)))
+#    # Annual ratio
+    pe_in = s.e_to_prec.sum(dim=['aridity','month']).where((ai.Band1>0)&land_mask).weighted(weights).mean().values # in drylands
+    pe_out = s.e_to_prec.sum(dim=['aridity','month']).where((ai.Band1.isnull()&land_mask)).weighted(weights).mean().values# out drylands
+    pe_land = s.e_to_prec.sum(dim=['aridity','month']).where((ai.Band1>0)&land_mask).weighted(weights).mean().values # in drylands
+    pe_all = s.e_to_prec.sum(dim=['aridity','month']).where(ai.Band1>0).weighted(weights).mean().values# all contributions
+    print('terestrial contribution to precipitation is %f'%(pe_land/pe_all))
+    print('dryland terestrial internal contribution to precipitation is %f'%(pe_in/(pe_in+pe_out)))
+    print('dryland terestrial external contribution to precipitation is %f'%(pe_out/(pe_in+pe_out)))
+    print('dryland terestrial contribution to precipitation is %f'%(pe_in/pe_all))
+
+#    # Monthly ratio
+#    pe_in = s.e_to_prec.sum(dim=['aridity']).where((ai.Band1>0)&(land_mask)).weighted(weights).mean(['lat','lon']).values # in drylands
+#    pe_out = s.e_to_prec.sum(dim=['aridity']).where((ai.Band1.isnull())&land_mask).weighted(weights).mean(['lat','lon']).values# out drylands
+#    pe_all = s.e_to_prec.sum(dim=['aridity']).where(ai.Band1>0).weighted(weights).mean().values# all contributions
+#    print('dryland monthly internal contribution to precipitation is ')
+#    print((pe_in/(pe_in+pe_out)))
+#    print('dryland monthly external contribution to precipitation is ')
+#    print((pe_out/pe_all))
 
 if __name__=="__main__":
    make_plot() 

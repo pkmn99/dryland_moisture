@@ -58,7 +58,7 @@ def make_plot():
     ax1.set_ylabel('P$_\mathrm{E}$(mm/yr)',color='b',labelpad=0.5)
     ax1.set_xticks(range(2001,2021,3))
     ax1sec.set_ylabel('KNDVI*10000',color='g',labelpad=1)
-    ax1.legend(['P$_\mathrm{E}$','P'],frameon=False)
+#    ax1.legend(['P$_\mathrm{E}$','P'],frameon=False)
     ax1.legend([ax1.lines[0],ax1sec.lines[0]],['P$_\mathrm{E}$','KNDVI'],frameon=False)
 
 

@@ -119,7 +119,8 @@ def load_gpp_data(temporal_res="y",start_year=2003,end_year=2018,cn_label=True):
 
 # Load precipitation contribution from ET (P_E)
 def load_e2p_data(var,temporal_res,start_year=1990,end_year=2022,et_data='ERA5'):
-    file_daterange={"GLEAM":[1990,2020],
+   # file_daterange={"GLEAM":[1990,2020],
+    file_daterange={"GLEAM":[2002,2022],
                     "ERA5":[2003,2022]}
     d = xr.open_dataset('../data/results/%s_e_to_prec_mon_%d-%d.nc'%(et_data,file_daterange[et_data][0],
                                                                          file_daterange[et_data][1]))
@@ -135,9 +136,9 @@ def load_e2p_data(var,temporal_res,start_year=1990,end_year=2022,et_data='ERA5')
     return d
 
 # Load gleam et data
-def load_gleam_data(temporal_res,spatial_res='05deg',start_year=1990,end_year=2020,cn_label=True):
-    d = xr.open_dataset('../data/GLEAM_v3.5a-ET-1980-2020-mon-05deg.nc')['E'].sel(time=slice(str(start_year),str(end_year)))
-     
+def load_gleam_data(temporal_res,spatial_res='05deg',start_year=2002,end_year=2020,cn_label=True):
+    d = xr.open_dataset('../data/GLEAM_v4.1a-ET-2002-2023-mon-05deg.nc')['E'].sel(time=slice(str(start_year),str(end_year)))
+
     if temporal_res=='y':
         d=d.sel(time=slice(str(start_year),str(end_year))).resample(time="Y").sum(dim=['time'])
 
@@ -172,7 +173,8 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
     if et_data=="ERA5":
         dfe = load_era5_data('ET','mon')
     if et_data=="GLEAM":
-        dfe = xr.open_dataset('../data/GLEAM_v3.5a-ET-1980-2020-mon-05deg.nc')['E'].sel(time=slice(str(start_year),str(end_year)))
+       # dfe = xr.open_dataset('../data/GLEAM_v3.5a-ET-1980-2020-mon-05deg.nc')['E'].sel(time=slice(str(start_year),str(end_year)))
+        dfe = xr.open_dataset('../data/GLEAM_v4.1a-ET-2002-2023-mon-05deg.nc')['E'].sel(time=slice(str(start_year),str(end_year)))
        
     # land mask fraction
     lsm=xr.open_dataset('../../data/ERA5/ERA5-landseamask-1990-2022-mon-05deg.nc')['lsm'].squeeze()
@@ -267,7 +269,7 @@ def save_e_to_prec(start_year=1990,end_year=2022,et_data='ERA5'):
     result_xr['e_to_prec'].attrs["long_name"] = "Upwind evaporation contributed precipitation"
     result_xr['upwind_ET'].attrs["long_name"] = "Upwind mean ET"
 
-    result_xr.to_netcdf('../data/results/%s_e_to_prec_mon_%d-%d0109.nc'%(et_data,start_year,end_year))
+    result_xr.to_netcdf('../data/results/%s_e_to_prec_mon_%d-%d0805.nc'%(et_data,start_year,end_year))
 
     print('file saved')
 
@@ -414,8 +416,9 @@ if __name__=="__main__":
 #    save_cn_label(rerun=True)
 #    save_e_to_prec(start_year=1990, end_year=2020,et_data='GLEAM')
 #    save_e_to_prec(start_year=2000, end_year=2020,et_data='GLEAM')
+    save_e_to_prec(start_year=2002, end_year=2022,et_data='GLEAM')
 #    save_e_to_prec(start_year=2000, end_year=2022,et_data='ERA5')
-    save_e_to_prec(start_year=2003, end_year=2022,et_data='ERA5')
+#    save_e_to_prec(start_year=2003, end_year=2022,et_data='ERA5')
 #    save_e_to_prec(start_year=1990, end_year=2022,et_data='ERA5')
 #    save_e_to_prec_ymonmean()
 #    save_prec_source_aridity()

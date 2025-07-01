@@ -7,14 +7,14 @@ from scipy import stats
 from plot_pe_prec_corr_map import load_era5_data,load_e2p_data
 from plot_pe_kndvi_corr import stats_corr,detrend
 # show regional mean Pe and precipitation 
-def make_plot():
+def make_plot(et_data='GLEAM'):
     c=0
-    start_year=2001
-    end_year=2020
+    start_year=2023
+    end_year=2022
 
     # Load data
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc') #
-    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=2020,et_data='GLEAM')
+    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=end_year,et_data=et_data)
     dp_ycn=load_era5_data('prec','y',cn_label=True)
 
     # Calculate correlation
@@ -27,6 +27,7 @@ def make_plot():
     R_array = pd.DataFrame(np.array(rpep_temp),columns=['R','p'])
     R_array.loc[0:4,'var']='PEP'
     R_array.loc[:,'Aridity']=list(range(1,5))
+    print(R_array)
 
     # Begin plotting 
     fig, [ax1,ax2]=plt.subplots(1,2,figsize=(10,4))
@@ -65,8 +66,8 @@ def make_plot():
     ax2.text(-0.125, 1.05, 'b', fontsize=14, transform=ax2.transAxes, fontweight='bold')
 
     plt.subplots_adjust(left=0.05,right=0.95,wspace=0.2)
-    plt.savefig('../figure/fig_pe_prec_corr.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_pe_prec_corr_%s-1205.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
-    make_plot()
+    make_plot(et_data='ERA5')

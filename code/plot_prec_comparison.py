@@ -5,65 +5,16 @@ import cartopy.crs as ccrs
 import cartopy.io.shapereader as shpreader
 from cartopy.feature import ShapelyFeature
 import cartopy.feature as cfeature
+from process_et2prec import load_era5_data,load_e2p_data
 
-# temporal_res: 'y' 'mon' 'ymonmean'
-# spatial_res: '025deg','050deg'
-# Load ERA5 data with various options
-def load_era5_data(var,temporal_res,spatial_res='05deg',start_year=1990,end_year=2022,cn_label=False):
-    d = xr.open_dataset('../../data/ERA5/ERA5-%s-%d-%d-%s-%s.nc'%(var,start_year,end_year,
-                                                                  'mon',spatial_res))
-    var_text={'prec':'tp','ET':'e','temp':'t2m','solar':'msdwswrf'}
-    var_unit_scaler={'prec':1000,'ET':-1000}
-
-    # do unit conversion
-
-    if temporal_res=='y':
-        if ((var=='prec') or (var=='ET')):
-            d=(d[var_text[var]]*d.time.dt.daysinmonth).resample(time="Y").sum(dim=['time'])*var_unit_scaler[var]
-        else:
-            d=d[var_text[var]].resample(time="Y").mean(dim=['time'])
-
-    if temporal_res=='ymonmean':
-        if ((var=='prec') or (var=='ET')):
-            d=(d[var_text[var]]*d.time.dt.daysinmonth).groupby("time.month").mean(dim=['time'])*var_unit_scaler[var]
-        else:
-            d=d[var_text[var]].groupby("time.month").mean(dim=['time'])
-
-    if temporal_res=='mon':
-        if ((var=='prec') or (var=='ET')):
-            d=(d[var_text[var]]*d.time.dt.daysinmonth)*var_unit_scaler[var]
-        else:
-            d=d[var_text[var]]
-
-    # if China subset
-    if cn_label:
-#         d_ref=xr.open_dataset('../data/results/e_to_prec_mon_2008-2017.nc')
-        d_ref=xr.open_dataset('../data/results/e_to_prec_mon_1990-2022.nc')
-
-        return d.sel(lat=d_ref.lat, lon=d_ref.lon, method="nearest")
-    else:
-        return d
-#     ERA5-prec-1990-2022-mon-025deg.nc
-
-
-def load_e2p_data(var,temporal_res,start_year=1990,end_year=2022,et_data='ERA5'):
-    if et_data=='GLEAM':
-        d = xr.open_dataset('../data/results/%s_e_to_prec_mon_%d-%d.nc'%(et_data,start_year,
-                                                                   end_year))
-    else:
-        d = xr.open_dataset('../data/results/e_to_prec_mon_%d-%d.nc'%(start_year,
-                                                                 end_year))
-    if temporal_res=='y':
-        d=d[var].resample(time="Y").sum(dim=['time'])
-
-    if temporal_res=='ymonmean':
-        d=d[var].groupby("time.month").mean(dim=['time'])
-
-    if temporal_res=='mon':
-        d=d[var]
-
-    return d
-
+# Create area weights
+# Usage df.weighted(weights).sum()
+def my_weights(da):
+    # create area weights following
+    # https://docs.xarray.dev/en/stable/examples/area_weighted_temperature.html
+    weights = np.cos(np.deg2rad(da.lat))
+    weights.name = "weights"
+    return weights
 
 def plot_map(d, ax, levels, minmax=[],cmap='rainbow_r',extent=[73, 135, 28, 52],pr=ccrs.PlateCarree(),
              lw=0.5,mycolorbar=False):
@@ -87,57 +38,70 @@ def plot_map(d, ax, levels, minmax=[],cmap='rainbow_r',extent=[73, 135, 28, 52],
     ax.set_extent(extent,ccrs.Geodetic())
     ax.coastlines()
     ax.add_feature(cfeature.OCEAN)
+   # ax.add_feature(cfeature.LAND,facecolor='none')
     ax.add_feature(cfeature.LAND)
     return im
 
-# linear trend
-def linear_trend(x,y):
+# linear trend and corr
+def linear_trend_corr(x,y):
     con = (~np.isnan(x)) & (~np.isnan(y))
     b = np.polyfit(x[con],y[con],deg=1)
     print('r=%f'%np.corrcoef(x[con],y[con])[0,1])
-    return np.polyval(b,x)
+    return np.polyval(b,x),np.corrcoef(x[con],y[con])[0,1]
 
-def make_plot():
+def make_plot(et_data='GLEAM'):
 
     # load data, precipitation by ERA5 land and all ET 
 #    dep_ycn_land=load_e2p_data('e_to_prec_land','y',end_year=2022)
 #    dep_ycn=load_e2p_data('e_to_prec','y',end_year=2022)
     # precipitation by gleam ET 
-    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=2020,et_data='GLEAM')
+    dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=2022,et_data=et_data)
 
     # ERA5 precipitation
     dp_ycn=load_era5_data('prec','y',cn_label=True)
+    print(dp_ycn.shape)
+    print(dep_ycn_gleam.shape)
     # Aridity index
     ai=xr.open_dataset('../data/AI_1901-2017_360x720.nc')
 
     ai_con=ai.Band1>0
     
     pr=ccrs.PlateCarree()
+
+    w=my_weights(dp_ycn)
     
     fig = plt.figure(figsize=[10, 10])
     
     ax1 = fig.add_axes([0, 0.5, 0.4, 0.35], projection=pr)
     im=plot_map(dep_ycn_gleam.mean(dim='time').where(ai_con),ax=ax1, levels=np.arange(0,1000,10),
              cmap='Blues')
-    ax1.set_title('Precipitation by upwind land ET')
+    ax1.set_title('Precipitation by upwind ET (P$_\mathrm{E}$)')
     
     ax2 = fig.add_axes([0, 0.28, 0.4, 0.35], projection=pr)
     plot_map(dp_ycn.mean(dim='time').where(ai_con),ax=ax2, levels=np.arange(0,1000,10),
              cmap='Blues')
-    ax2.set_title('Precipitation of ERA5')
+    ax2.set_title('Precipitation of ERA5 (P)')
+    # add regional mean P
+    ax1.text(0.5, 0.85, '%dmm'%dep_ycn_gleam.mean(dim='time').where(ai_con).weighted(w).mean().values,
+             fontsize=12, transform=ax1.transAxes, ha='center')
+    ax2.text(0.5, 0.85, '%dmm'%dp_ycn.mean(dim='time').where(ai_con).weighted(w).mean().values,
+             fontsize=12, transform=ax2.transAxes, ha='center')
+    print('precip in dryland area mean is %f'%dp_ycn.mean(dim='time').where(ai_con).weighted(w).mean().values)
+    print('precip contribution in dryland area mean is %f'%dep_ycn_gleam.mean(dim='time').where(ai_con).weighted(w).mean().values)
     
     ax3 = fig.add_axes([0.5, 0.4, 0.4, 0.35])
     ax3.scatter(dep_ycn_gleam.mean(dim='time').where(ai.Band1>0).values.flatten(),
                 dp_ycn.mean(dim='time').where(ai.Band1>0).values.flatten(),color='royalblue',s=5)
-    
+
+    [ft,r]=linear_trend_corr(dep_ycn_gleam.mean(dim='time').where(ai.Band1>0).values.flatten(),
+                        dp_ycn.mean(dim='time').where(ai.Band1>0).values.flatten())
     plt.plot(dep_ycn_gleam.mean(dim='time').where(ai.Band1>0).values.flatten(),
-             linear_trend(dep_ycn_gleam.mean(dim='time').where(ai.Band1>0).values.flatten(),
-             dp_ycn.mean(dim='time').where(ai.Band1>0).values.flatten()),'r')
+             ft,'r')
     ax3.plot([0,1200],[0,1200],'k--')
-    ax3.text(1000,150,'r=0.83')
+    ax3.text(1000,150,'$r$=%.2f'%r)
     
-    ax3.set_xlabel('Precipitation by upwind land ET (mm/yr)')
-    ax3.set_ylabel('Precipitation of ERA5 (mm/yr)')
+    ax3.set_xlabel('P$_\mathrm{E}$ (mm/yr)')
+    ax3.set_ylabel('P (mm/yr)')
     ax3.set_ylim([0,1200])
     ax3.set_xlim([0,1200])
     
@@ -153,10 +117,9 @@ def make_plot():
     ax2.text(-0.02, 1.05, 'b', fontsize=14, transform=ax2.transAxes, fontweight='bold')
     ax3.text(-0.02, 1.05, 'c', fontsize=14, transform=ax3.transAxes, fontweight='bold')
 
-
-    plt.savefig('../figure/fig_prec_comparision.png',dpi=300,bbox_inches='tight')
+    plt.savefig('../figure/fig_prec_comparision_%s0129.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
-    make_plot()
+    make_plot(et_data='ERA5')
     

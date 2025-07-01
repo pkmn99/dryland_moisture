@@ -7,7 +7,7 @@ from scipy import stats
 import cartopy.crs as ccrs
 from plot_prec_comparison import plot_map
 from plot_china_dryland_source import set_lat_lon
-from process_et2prec import load_era5_data,load_gleam_data,load_e2p_data,load_evi_data
+from process_et2prec import load_era5_data,load_e2p_data,load_evi_data
 from plot_pe_prec_corr_map import xr_detrend,xr_stats_corr
 from plot_pe_evi_corr import ds_month_range
 

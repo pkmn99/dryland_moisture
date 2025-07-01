@@ -40,7 +40,10 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
         evi = ds_month_range(load_evi_data(temporal_res='mon',source=source))
         dp_ycn=ds_month_range(load_era5_data('prec','mon',cn_label=True))
        # precipitation contribution from all source grids
-        dep_ycn_gleam=ds_month_range(load_e2p_data('e_to_prec_land','mon',end_year=end_year,et_data=et_data))
+        if et_data=='ERA5':
+            dep_ycn_gleam=ds_month_range(load_e2p_data('e_to_prec_land','mon',end_year=end_year,et_data=et_data))
+        if et_data=='GLEAM':
+            dep_ycn_gleam=ds_month_range(load_e2p_data('e_to_prec','mon',end_year=end_year,et_data=et_data))
 
         # precipitation contribution only from dryland grids
         dep_ycn_cndry=ds_month_range(load_e2p_data('e_to_prec_cndry','mon',start_year=start_year,end_year=end_year))
@@ -50,7 +53,10 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
 
     else:
         evi = load_evi_data(source=source) # * 10 for terra
-        dep_ycn_gleam=load_e2p_data('e_to_prec_land','y',end_year=end_year,et_data=et_data)
+        if et_data=='ERA5':
+            dep_ycn_gleam=load_e2p_data('e_to_prec_land','y',end_year=end_year,et_data=et_data)
+        if et_data=='GLEAM':
+            dep_ycn_gleam=load_e2p_data('e_to_prec','y',end_year=end_year,et_data=et_data)
         dp_ycn=load_era5_data('prec','y',cn_label=True)
    #    evi = load_evi_data(temporal_res='y',source='aqua')
 
@@ -115,7 +121,7 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
                      detrend(evi.sel(time=slice(str(start_year),str(end_year))).where(ai_con&p_con).mean(dim=['lat','lon']).values*10000))
     
     ax1.text(0.05,0.075,'r=%.2f\np=%.3f'%(r,p),transform=ax1.transAxes)
-    ax1.set_ylabel('P$_mathrm{E}$(mm/yr)',color='b',labelpad=0.5)
+    ax1.set_ylabel('$\mathrm{P_E}$ (mm/yr)',color='b',labelpad=0.5)
     ax1.set_xticks(range(2003,2022,3))
     ax1sec.set_ylabel('EVI*10000',color='g',labelpad=1)
     ax1.legend([ax1.lines[0],ax1sec.lines[0]],['$\overline{\mathrm{P_E}}$','$\overline{\mathrm{EVI}}$'],
@@ -175,9 +181,9 @@ def make_plot(et_data='GLEAM',p_data='pe',grow_season=True):
     ax2.text(-0.12, 1.05, 'b', fontsize=14, transform=ax2.transAxes, fontweight='bold')
     ax3.text(-0.05, 1.05, 'c', fontsize=14, transform=ax3.transAxes, fontweight='bold')
     if grow_season:
-        plt.savefig('../figure/fig_pe_evi_corr_%s_gs0617.png'%et_data,dpi=300,bbox_inches='tight')
+        plt.savefig('../figure/fig_pe_evi_corr_%s_gs0806.tif'%et_data,dpi=300,bbox_inches='tight')
     else:
-        plt.savefig('../figure/fig_pe_evi_corr_%s_annual0129.png'%et_data,dpi=300,bbox_inches='tight')
+        plt.savefig('../figure/fig_pe_evi_corr_%s_annual0806.png'%et_data,dpi=300,bbox_inches='tight')
     print('Fig saved')
 
 if __name__=="__main__":
